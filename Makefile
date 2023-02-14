@@ -7,4 +7,4 @@ yqsh:
 	$(CC) $(CFLAGS) -o $(TARGET_DIR)/yqsh yqsh.c
 
 clean:
-	rm yqsh
+	rm $(TARGET_DIR)/yqsh
