@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <string.h>
+#include <sys/wait.h>
 
 #ifndef NULL_CHECK
 #define NULL_CHECK(ptr) if (ptr == NULL) { fprintf(stderr, "OOM"); exit(1); } 
@@ -24,7 +25,13 @@ const char* VERSION = "0.0.1";
 
 void yqsh_read_line(char* linebuf) 
 {
+    memset(linebuf, 0, YQSH_BUFSIZE);
     char* str = fgets(linebuf, YQSH_BUFSIZE, stdin);
+    if (feof(stdin))
+    {
+        return;
+    }
+    // TODO: Make redirecting a file to stdin work
     if (str == NULL)
     {
         fprintf(stderr, "Fgets error");
@@ -32,53 +39,70 @@ void yqsh_read_line(char* linebuf)
     }
 }
 
+/*
+ * line is the line recieved from the user
+ * args is an allocated array of char pointers to store pointers to each argument
+*/
 void yqsh_parse_line(char* line, char** args)
 {
+
     char* start = line;
     char* curr = start;
+    char* next = curr;
     int curr_arg = 0;
     while (*curr != '\0' && curr != NULL)
-    {    
+    {
+        next = curr + 1;
         if (isspace(*curr))
         {
-            // clear the contents of args[curr_arg], then copy the word
-            memset(args[curr_arg], 0, YQSH_ARG_LEN);
-            memcpy(args[curr_arg], start, curr - start);
-            printf("%s\n", args[curr_arg]);
+            // replace the first whitespace character after a word with null terminator,
+            // then store a pointer to the beginning of the word in args
+            *curr = '\0';
+            args[curr_arg] = start;
+            // printf("%s\n", args[curr_arg]);
             curr_arg++;
-            while(curr != NULL && isspace(*curr))
+            while(next != NULL && isspace(*next))
             {
-                curr++;
+                next++;
             }
-            start = curr;
+            start = next;
         }
-        curr++;
+        curr = next;
     }
+    args[curr_arg] = NULL;
+}
 
+int run_command(char** args)
+{
+    int pid = fork();
+    if (pid != 0)
+    {
+        return pid;
+    }
+    int rc = execvp(args[0], args);
+    if (rc == -1)
+    {
+        fprintf(stderr, "Error while execing");
+        
+    }
+    return pid;
+    
 }
 
 void yqsh_loop() 
 {
     char buf[YQSH_BUFSIZE];
     char* args[YQSH_MAX_ARGS];
-    for (int i = 0; i < YQSH_MAX_ARGS; i++)
-    {
-        args[i] = malloc(sizeof(char) * YQSH_ARG_LEN);
-        NULL_CHECK(args[i]);
-    }
 
     while (1)
     {
-        printf("yqsh> ");
+        printf("\nyqsh> ");
         
         yqsh_read_line(buf);
         yqsh_parse_line(buf, args);
-    }
-    
-    // TODO: intercept SIGTERM to cleanup
-    for (int i = 0; i < YQSH_MAX_ARGS; i++)
-    {
-        free(args[i]);
+        run_command(args);
+        int rc = 0;
+        int pid = wait(&rc);
     }
 }
 
