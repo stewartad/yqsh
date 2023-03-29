@@ -1,27 +1,55 @@
+#include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/types.h>
 #include <unistd.h>
-#include <ctype.h>
 #include <string.h>
 #include <sys/wait.h>
 
-#ifndef NULL_CHECK
-#define NULL_CHECK(ptr) if (ptr == NULL) { fprintf(stderr, "OOM"); exit(1); } 
-#endif
+#include "yqsh.h"
 
-#ifndef YQSH_BUFSIZE
-#define YQSH_BUFSIZE 1024
-#endif
+yqsh_job* first_job = NULL;
+yqsh_job* last_job = NULL;
 
-#ifndef YQSH_MAX_ARGS
-#define YQSH_MAX_ARGS 256
-#endif
+/* Returns true if given job is completed */
+int job_is_completed(yqsh_job* job)
+{
+    for (yqsh_process* p = job->first_process; p; p = p->next)
+    {
+        if (!p->completed)
+        {
+            return 0;
+        }
+    }
+    return 1;
+}
 
-#ifndef YQSH_ARG_LEN
-#define YQSH_ARG_LEN 256
-#endif
+/* Returns true if given job is stopped */
+int job_is_stopped(yqsh_job *job)
+{
+    for (yqsh_process* p = job->first_process; p; p = p->next) 
+    {
+        if (!p->completed && !p->stopped)
+        {
+            return 0;
+        }
+    }
+    return 1;
+}
 
-const char* VERSION = "0.0.1";
+/* Searches all jobs and returns one with pgid, or NULL if no job with that pgid exists */
+yqsh_job* find_job(pid_t pgid)
+{
+    yqsh_job* job = first_job;
+    for (job = first_job; job; job = job->next)
+    {
+        if (job->pgid == pgid)
+        {
+            return job;
+        }
+    }
+    return NULL;
+}
 
 void yqsh_read_line(char* linebuf) 
 {
@@ -37,6 +65,37 @@ void yqsh_read_line(char* linebuf)
         fprintf(stderr, "Fgets error");
         linebuf[0] = '\0';
     }
+}
+
+/*
+ * Separates arguments in line by whitespace.
+ * If line is empty or contains only whitespace, returns NULL, 
+ * otherwise allocates and returns an array of strings.
+ * Stores the number of arguments parsed in nargs.
+ */
+char** yqsh_separate_args(char *line, size_t* nargs)
+{
+    char* delim = " \r\n\t";
+    char* arg = strtok(line, delim);
+    if (arg == NULL)
+    {
+        return NULL;
+    }
+    size_t cur_size = 512;
+    char** args = malloc(cur_size * sizeof(char*));
+    args[0] = arg;
+    size_t n = 1;
+    while (arg = strtok(NULL, delim), arg != NULL)
+    {
+        if (n >= cur_size)
+        {
+            args = realloc(args, cur_size * 2 * sizeof(char*));
+            cur_size *= 2;
+        }
+        args[n++] = arg;
+    }
+    *nargs = n;
+    return args;
 }
 
 /*
@@ -94,26 +153,21 @@ void yqsh_loop()
     char buf[YQSH_BUFSIZE];
     char* args[YQSH_MAX_ARGS];
 
+    size_t bufsize = YQSH_BUFSIZE;
+    char* linebuf = malloc(bufsize);
+    size_t nargs;
+    NULL_CHECK(linebuf);
     while (1)
     {
         printf("\nyqsh> ");
         
-        yqsh_read_line(buf);
-        yqsh_parse_line(buf, args);
-        run_command(args);
+        int n = getline(&linebuf, &bufsize, stdin);
+        //yqsh_read_line(buf);
+        //yqsh_parse_line(buf, args);
+        char** args2 = yqsh_separate_args(linebuf, &nargs);
+        run_command(args2);
         int rc = 0;
         int pid = wait(&rc);
     }
 }
 
-int main(int argc, char const *argv[])
-{
-    // Initialization
-    // TODO: read config file
-    printf("yqsh version %s\n", VERSION);   
-    // Main loop
-    yqsh_loop();
-    // Cleanup
-    
-    return EXIT_SUCCESS;
-}
