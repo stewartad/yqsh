@@ -1,19 +1,27 @@
-CC=gcc
-CFLAGS=-Wall -g
-TARGET_DIR=bin
+CC           := gcc
+CFLAGS       := -Wall -Wextra -g -Wno-unused-parameter -Wno-unused-function -Wdouble-promotion -Wconversion -Wno-sign-conversion -fsanitize=address -fsanitize=undefined
 
-yqsh: yqsh.o main.c
-	mkdir -p $(TARGET_DIR)
-	$(CC) $(CFLAGS) -o $(TARGET_DIR)/$@ $^
+TARGETDIR    := bin
+BUILDDIR     := obj
+SRCDIR       := src
+TESTDIR      := test
 
-test: yqsh.o test.c
-	mkdir -p $(TARGET_DIR)
-	$(CC) $(CFLAGS) -o $(TARGET_DIR)/$@ $^
+TARGET       := yqsh
+OBJS         := $(BUILDDIR)/yqsh.o
 
-yqsh.o: yqsh.c yqsh.h
+$(TARGET): $(OBJS) $(SRCDIR)/main.c
+	mkdir -p $(TARGETDIR)
+	$(CC) $(CFLAGS) -o $(TARGETDIR)/$@ $^
+
+test: $(OBJS) $(TESTDIR)/test.c 
+	mkdir -p $(TARGETDIR)
+	$(CC) $(CFLAGS) -o $(TARGETDIR)/$@ $^ -I$(SRCDIR)
+
+$(BUILDDIR)/%.o: $(SRCDIR)/%.c
+	mkdir -p $(BUILDDIR)
+	$(CC) -c $(CFLAGS) $(SRCDIR)/$*.c -o $(BUILDDIR)/$*.o
+
+.PHONY: clean
 
 clean:
-	rm *.o
-	rm $(TARGET_DIR)/yqsh
-	rm $(TARGET_DIR)/test
-
+	rm -f $(BUILDDIR)/*.o $(TARGETDIR)/yqsh $(TARGETDIR)/test
