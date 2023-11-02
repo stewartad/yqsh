@@ -161,13 +161,14 @@ void yqsh_loop()
     {
         printf("\nyqsh> ");
         
-        int n = getline(&linebuf, &bufsize, stdin);
+        size_t n = getline(&linebuf, &bufsize, stdin);
         //yqsh_read_line(buf);
         //yqsh_parse_line(buf, args);
         char** args2 = yqsh_separate_args(linebuf, &nargs);
+        args2[nargs] = 0;
         run_command(args2);
         int rc = 0;
         int pid = wait(&rc);
-    }
+   }
 }
 
