@@ -35,6 +35,6 @@ int job_is_completed(yqsh_job* job);
 int job_is_stopped(yqsh_job *job);
 yqsh_job* find_job(pid_t pgid);
 char** yqsh_separate_args(char *line, size_t* nargs);
-void yqsh_loop();
+void yqsh_loop(int, const char**);
 
 #endif

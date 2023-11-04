@@ -1,3 +1,5 @@
+#include <ctype.h>
+#include <errno.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -53,7 +55,6 @@ yqsh_job* find_job(pid_t pgid)
 
 void yqsh_read_line(char* linebuf) 
 {
-    memset(linebuf, 0, YQSH_BUFSIZE);
     char* str = fgets(linebuf, YQSH_BUFSIZE, stdin);
     if (feof(stdin))
     {
@@ -96,6 +97,40 @@ char** yqsh_separate_args(char *line, size_t* nargs)
     }
     *nargs = n;
     return args;
+}
+
+void yqsh_parse_args(char *line, char** args, size_t* nargs)
+{
+    char *p = line;
+    int argc = 0;
+    
+    // ignore leading whitespace
+    while (*p != 0 && isspace(*p))
+    {
+        p++;
+    }
+
+    char *start = p;
+    while (*p != 0)
+    {
+        if (isspace(*p))
+        {
+            *p = '\0';
+            if (p != line && *(p - 1) == '\0')
+            {
+                // break if this arg is empty string
+                break;
+            }
+            args[argc++] = start;
+            p = p + 1;
+            start = p;
+        }
+        else 
+        {
+            p = p + 1;
+        }
+    }
+    *nargs = argc;
 }
 
 /*
@@ -141,14 +176,14 @@ int run_command(char** args)
     int rc = execvp(args[0], args);
     if (rc == -1)
     {
-        fprintf(stderr, "Error while execing");
+        fprintf(stderr, "Error while execing: %d", errno);
         
     }
     return pid;
     
 }
 
-void yqsh_loop() 
+void yqsh_loop(int argc, const char** argv) 
 {
     char buf[YQSH_BUFSIZE];
     char* args[YQSH_MAX_ARGS];
@@ -157,16 +192,31 @@ void yqsh_loop()
     char* linebuf = malloc(bufsize);
     size_t nargs;
     NULL_CHECK(linebuf);
-    while (1)
+    int running = 1;
+    while (running)
     {
-        printf("\nyqsh> ");
-        
-        size_t n = getline(&linebuf, &bufsize, stdin);
-        //yqsh_read_line(buf);
-        //yqsh_parse_line(buf, args);
-        char** args2 = yqsh_separate_args(linebuf, &nargs);
-        args2[nargs] = 0;
-        run_command(args2);
+        memset(linebuf, 0, YQSH_BUFSIZE);
+        memset(args, 0, YQSH_BUFSIZE);
+
+        printf("yqsh> ");
+        if (argc > 1)
+        {
+            //char** args2 = yqsh_separate_args(argv, &nargs);
+            //args2[nargs] = 0;
+            //run_command(argv);
+            //int rc = 0;
+            //running = 0;
+            //int pid = wait(&rc);
+        } else 
+        {
+            //__ssize_t n = getline(&linebuf, &bufsize, stdin);
+            yqsh_read_line(buf);
+            yqsh_parse_args(buf, args, &nargs);
+            if (nargs > 0)
+            {
+                run_command(args);
+            }
+        }
         int rc = 0;
         int pid = wait(&rc);
    }
