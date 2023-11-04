@@ -116,12 +116,12 @@ void yqsh_parse_args(char *line, char** args, size_t* nargs)
         if (isspace(*p))
         {
             *p = '\0';
-            if (p != line && *(p - 1) == '\0')
+            if (p != line && *(p - 1) != '\0')
             {
-                // break if this arg is empty string
-                break;
+                // add as an arg only if prev character is not null
+                // i.e. this string is not empty
+                args[argc++] = start;
             }
-            args[argc++] = start;
             p = p + 1;
             start = p;
         }
